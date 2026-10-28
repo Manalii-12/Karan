@@ -2,16 +2,38 @@ import os
 import sys
 import json
 import requests
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, Response
 
 app = Flask(__name__)
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-HTML_PATH = os.path.join(BASE_DIR, "public", "index.html")
-if not os.path.exists(HTML_PATH):
-    HTML_PATH = os.path.join(BASE_DIR, "html.html")
-if not os.path.exists(HTML_PATH):
-    HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "index.html")
+# Search and load HTML content
+HTML_CONTENT = ""
+SEARCH_PATHS = [
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "html.html"),
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "index.html"),
+    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "html.html"),
+    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "public", "index.html"),
+    "api/html.html",
+    "html.html",
+    "public/index.html"
+]
+
+for p in SEARCH_PATHS:
+    if os.path.exists(p):
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                content = f.read()
+                if content and len(content) > 500:
+                    HTML_CONTENT = content
+                    break
+        except Exception as e:
+            print(f"[HTML Load] Failed reading {p}: {e}")
+
+# Fallback minimal HTML in case files are unreachable
+if not HTML_CONTENT:
+    HTML_CONTENT = """<!DOCTYPE html><html><head><title>Karan AI Assistant</title></head>
+    <body style="background:#080c1a;color:#fcf6ea;font-family:sans-serif;text-align:center;padding:60px;">
+    <h1>Karan AI Assistant</h1><p>Online and ready.</p></body></html>"""
 
 # LLM Providers Configuration
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
@@ -25,6 +47,11 @@ def add_cors_headers(response):
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     return response
+
+# Root Route: Serves the full Indian Tactical AI Assistant UI
+@app.route("/", methods=["GET"])
+def home():
+    return Response(HTML_CONTENT, mimetype="text/html; charset=utf-8")
 
 @app.route("/status", methods=["GET", "OPTIONS"])
 @app.route("/api/status", methods=["GET", "OPTIONS"])
@@ -68,10 +95,10 @@ def status():
 
 def handle_actions(normalized):
     """Executes predefined smart actions for instant, reliable responses."""
-    # Greetings & Salutations (including 'hii', 'hello', 'hey', 'namaste')
+    # Greetings & Salutations (instant <5ms reply)
     if any(k in normalized for k in ["namaste", "pranam", "how are you", "kaise ho", "hello", "hi", "hii", "heyy", "hey", "namaskar", "karan", "good morning", "good evening", "good afternoon"]):
         return {
-            "reply": "Namaste Captain! I am Karan, your personal AI assistant. All systems are operational. How may I assist you today?"
+            "reply": "Namaste Captain! I am Karan, your personal AI assistant. All cloud systems are online and operational. How may I assist you today?"
         }
 
     elif any(k in normalized for k in ["who are you", "what is your name", "identify yourself", "tell me about yourself"]):
@@ -200,21 +227,13 @@ def ask_llm(prompt):
     )
 
 # Universal Chat Route (handles /karan, /friday, /api/karan, and POST to /)
-@app.route("/", methods=["GET", "POST", "OPTIONS"])
 @app.route("/karan", methods=["GET", "POST", "OPTIONS"])
 @app.route("/friday", methods=["GET", "POST", "OPTIONS"])
-@app.route("/api", methods=["GET", "POST", "OPTIONS"])
 @app.route("/api/karan", methods=["GET", "POST", "OPTIONS"])
 @app.route("/api/friday", methods=["GET", "POST", "OPTIONS"])
 def chat():
     if request.method == "OPTIONS":
         return jsonify({"status": "ok"}), 200
-
-    # Serve HTML page on GET requests to root
-    if request.method == "GET" and (request.path == "/" or request.path == "/api"):
-        if os.path.exists(HTML_PATH):
-            return send_file(HTML_PATH)
-        return "<h3>Karan AI Assistant Online</h3>", 200
 
     data = request.get_json(silent=True) or {}
     message = data.get("message", "").strip()
