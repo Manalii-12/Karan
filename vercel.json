@@ -1,25 +1,35 @@
 {
   "version": 2,
-  "rewrites": [
+  "builds": [
     {
-      "source": "/karan",
-      "destination": "/api/index.py"
+      "src": "api/index.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/karan",
+      "dest": "api/index.py"
     },
     {
-      "source": "/friday",
-      "destination": "/api/index.py"
+      "src": "/friday",
+      "dest": "api/index.py"
     },
     {
-      "source": "/status",
-      "destination": "/api/index.py"
+      "src": "/status",
+      "dest": "api/index.py"
     },
     {
-      "source": "/auth/gmail",
-      "destination": "/api/index.py"
+      "src": "/auth/gmail",
+      "dest": "api/index.py"
     },
     {
-      "source": "/(.*)",
-      "destination": "/public/index.html"
+      "src": "/api/(.*)",
+      "dest": "api/index.py"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "public/index.html"
     }
   ]
 }

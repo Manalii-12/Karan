@@ -17,6 +17,7 @@ if not os.path.exists(HTML_PATH):
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+IS_VERCEL = bool(os.environ.get("VERCEL"))
 
 @app.after_request
 def add_cors_headers(response):
@@ -25,14 +26,12 @@ def add_cors_headers(response):
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     return response
 
-@app.route("/", methods=["GET"])
-def index():
-    if os.path.exists(HTML_PATH):
-        return send_file(HTML_PATH)
-    return "<h3>Karan AI Assistant Online</h3>", 200
-
-@app.route("/status", methods=["GET"])
+@app.route("/status", methods=["GET", "OPTIONS"])
+@app.route("/api/status", methods=["GET", "OPTIONS"])
 def status():
+    if request.method == "OPTIONS":
+        return jsonify({"status": "ok"}), 200
+
     if GROQ_API_KEY:
         engine = "Groq Cloud (Llama 3.3)"
         model_name = "llama-3.3-70b-versatile"
@@ -42,37 +41,40 @@ def status():
     elif GEMINI_API_KEY:
         engine = "Google Gemini (gemini-1.5-flash)"
         model_name = "gemini-1.5-flash"
-    else:
-        # Check if local Ollama is reachable
+    elif not IS_VERCEL:
         try:
-            r = requests.get("http://localhost:11434/api/tags", timeout=0.8)
+            r = requests.get("http://localhost:11434/api/tags", timeout=0.5)
             if r.status_code == 200:
                 engine = "Ollama Local (qwen2.5:0.5b)"
                 model_name = "qwen2.5:0.5b"
             else:
-                engine = "Karan Core Engine (Cloud Native)"
-                model_name = "karan-rule-engine"
+                engine = "Karan Core Engine"
+                model_name = "karan-smart-core"
         except Exception:
             engine = "Karan Cloud Engine"
             model_name = "karan-v1-cloud"
+    else:
+        engine = "Karan Cloud Engine (Vercel)"
+        model_name = "karan-cloud-native"
 
     return jsonify({
         "status": "online",
         "assistant": "Karan",
         "engine": engine,
         "model": model_name,
-        "platform": "Vercel Serverless",
+        "platform": "Vercel Serverless" if IS_VERCEL else "Local / Cloud",
         "gmail_connected": False
     })
 
 def handle_actions(normalized):
     """Executes predefined smart actions for instant, reliable responses."""
-    if any(k in normalized for k in ["namaste", "pranam", "how are you", "kaise ho", "hello", "hi"]):
+    # Greetings & Salutations (including 'hii', 'hello', 'hey', 'namaste')
+    if any(k in normalized for k in ["namaste", "pranam", "how are you", "kaise ho", "hello", "hi", "hii", "heyy", "hey", "namaskar", "karan", "good morning", "good evening", "good afternoon"]):
         return {
-            "reply": "Namaste Captain! I am Karan, your personal AI assistant. All cloud systems are fully operational. How may I assist you today?"
+            "reply": "Namaste Captain! I am Karan, your personal AI assistant. All systems are operational. How may I assist you today?"
         }
 
-    elif any(k in normalized for k in ["who are you", "what is your name", "karan", "identify yourself"]):
+    elif any(k in normalized for k in ["who are you", "what is your name", "identify yourself", "tell me about yourself"]):
         return {
             "reply": "I am Karan, an intelligent AI voice assistant inspired by modern Indian tactical interfaces. I can help you with web browsing, weather forecasts, live cricket scores, email tasks, and answering questions."
         }
@@ -158,22 +160,23 @@ def ask_llm(prompt):
         except Exception as e:
             print(f"[OpenAI Error] {e}")
 
-    # 3. Try Local Ollama if available
-    try:
-        r = requests.post(
-            "http://localhost:11434/api/generate",
-            json={
-                "model": "qwen2.5:0.5b",
-                "prompt": f"You are Karan, a helpful, polite AI assistant. Answer briefly in English to: {prompt}",
-                "stream": False,
-                "options": {"num_predict": 75}
-            },
-            timeout=3.0
-        )
-        if r.status_code == 200:
-            return r.json().get("response", "").strip()
-    except Exception:
-        pass
+    # 3. Try Local Ollama if not running on Vercel
+    if not IS_VERCEL:
+        try:
+            r = requests.post(
+                "http://localhost:11434/api/generate",
+                json={
+                    "model": "qwen2.5:0.5b",
+                    "prompt": f"You are Karan, a helpful, polite AI assistant. Answer briefly in English to: {prompt}",
+                    "stream": False,
+                    "options": {"num_predict": 75}
+                },
+                timeout=2.0
+            )
+            if r.status_code == 200:
+                return r.json().get("response", "").strip()
+        except Exception:
+            pass
 
     # 4. Built-in Smart Fallback Knowledge Engine
     p_lower = prompt.lower()
@@ -192,15 +195,26 @@ def ask_llm(prompt):
 
     return (
         f"Namaste Captain! I received your query: '{prompt}'. "
-        "I am ready to assist you. To enable deep generative intelligence on Vercel, "
+        "All cloud systems are operational. To enable deep generative intelligence on Vercel, "
         "you can add a free GROQ_API_KEY or OPENAI_API_KEY in your Vercel Project Environment Variables."
     )
 
-@app.route("/karan", methods=["POST", "OPTIONS"])
-@app.route("/friday", methods=["POST", "OPTIONS"])
+# Universal Chat Route (handles /karan, /friday, /api/karan, and POST to /)
+@app.route("/", methods=["GET", "POST", "OPTIONS"])
+@app.route("/karan", methods=["GET", "POST", "OPTIONS"])
+@app.route("/friday", methods=["GET", "POST", "OPTIONS"])
+@app.route("/api", methods=["GET", "POST", "OPTIONS"])
+@app.route("/api/karan", methods=["GET", "POST", "OPTIONS"])
+@app.route("/api/friday", methods=["GET", "POST", "OPTIONS"])
 def chat():
     if request.method == "OPTIONS":
         return jsonify({"status": "ok"}), 200
+
+    # Serve HTML page on GET requests to root
+    if request.method == "GET" and (request.path == "/" or request.path == "/api"):
+        if os.path.exists(HTML_PATH):
+            return send_file(HTML_PATH)
+        return "<h3>Karan AI Assistant Online</h3>", 200
 
     data = request.get_json(silent=True) or {}
     message = data.get("message", "").strip()
@@ -216,6 +230,7 @@ def chat():
     return jsonify({"reply": answer})
 
 @app.route("/auth/gmail", methods=["GET"])
+@app.route("/api/auth/gmail", methods=["GET"])
 def auth_gmail():
     return """
     <!DOCTYPE html>

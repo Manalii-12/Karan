@@ -806,7 +806,10 @@
         async function checkStatus() {
             const start = Date.now();
             try {
-                const res = await fetch(`${BASE_API}/status`, { method: 'GET' });
+                let res = await fetch(`${BASE_API}/status`, { method: 'GET' });
+                if (!res.ok) {
+                    res = await fetch(`${BASE_API}/api/status`, { method: 'GET' });
+                }
                 const ping = Date.now() - start;
                 pingValue.textContent = `${ping} ms`;
 
@@ -979,11 +982,19 @@
             chatMessages.scrollTop = chatMessages.scrollHeight;
 
             try {
-                const response = await fetch(`${BASE_API}/karan`, {
+                let response = await fetch(`${BASE_API}/karan`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ message: trimmed })
                 });
+
+                if (!response.ok) {
+                    response = await fetch(`${BASE_API}/api/karan`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message: trimmed })
+                    });
+                }
 
                 if (!response.ok) {
                     throw new Error(`HTTP Error: ${response.status}`);
@@ -1004,7 +1015,7 @@
             } catch (err) {
                 console.error(err);
                 typingIndicator.style.display = 'none';
-                addMessage('assistant', '⚠️ Unable to reach the Karan server. Please ensure the server is running on http://localhost:5000.');
+                addMessage('assistant', `⚠️ Connection error: ${err.message}. If running on Vercel, please check your deployment functions.`);
             } finally {
                 isWaitingForResponse = false;
             }
