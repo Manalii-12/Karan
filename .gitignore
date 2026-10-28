@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.env
+.venv/
+env/
+venv/
+
+# Vercel
+.vercel/
+
+# Secrets & Credentials
+credentials.json
+credentials.json.json
+token_gmail.pickle
+token.json
+jarvis-calendar.json.json
+
+# Binaries & Large Installers
+*.exe
+cloudflared.exe
+OllamaSetup.exe
+
+# OS generated
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store

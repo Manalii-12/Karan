@@ -1,0 +1,25 @@
+{
+  "version": 2,
+  "rewrites": [
+    {
+      "source": "/karan",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/friday",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/status",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/auth/gmail",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/public/index.html"
+    }
+  ]
+}
